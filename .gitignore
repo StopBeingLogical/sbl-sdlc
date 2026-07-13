@@ -1,0 +1,24 @@
+# Credentials and local configuration
+.auth
+.env
+.env.*
+!.env.example
+*.token
+
+# Model and generated binary artifacts
+*.gguf
+*.safetensors
+*.bin
+
+# Runtime and benchmark output
+*.log
+tmp/
+cache/
+artifacts/raw/private/
+
+# Editors and operating systems
+.DS_Store
+.idea/
+.vscode/
+*~
+*.swp
