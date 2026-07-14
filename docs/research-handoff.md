@@ -2,7 +2,7 @@
 type: notes
 title: Local-Only Multi-Model SDLC Research — Ideation, Review, and Current Design
 description: Historical proposal, GPT 5.6 review, empirical corrections, and current six-step cold-session workflow for local open-weight models
-timestamp: 2026-07-13T13:52:00Z
+timestamp: 2026-07-14T00:55:45Z
 updated: 2026-07-13
 status: working-design
 tags:
@@ -29,7 +29,7 @@ This document records three distinct layers of the project:
 
 The goal is not to make one model autonomously complete an entire software project. The goal is to determine how a rigorous software-development deliberation process can be run entirely on already-owned local hardware and open-weight models.
 
-For each of six SDLC steps, the operator begins from a cold session, gives one model the approved input packet, saves its output, and then repeats the step with a model from a different family or training lineage. A third model may review or adjudicate. This provides up to three independent sets of eyes per step while avoiding dependence on a single model's blind spots or accumulated conversational context.
+For each of six SDLC steps, the operator begins from a cold session and builds the artifact through a cumulative amendment ladder: a first model produces a skeleton that clears a human frame-gate, then successive models — ordered from least to most capable and drawn from different training lineages — each take the prior artifact and amend it as they see fit, with a non-editing teardown pass on the framing-heavy steps. This layers several sets of eyes onto every step, cancelling the weaknesses of any single local model while avoiding dependence on accumulated conversational context. (Parts I–II below preserve the earlier blind-pass/adjudication design this ladder replaced.)
 
 No cloud inference is required for the intended production workflow. External frontier models may review this research design, but they are not part of the local execution path being tested.
 
@@ -232,9 +232,9 @@ Operator note: all recorded Daemon models except Gemma 4 31B were able to load o
 
 1. Every step begins in a cold model session.
 2. Every session receives a versioned, self-contained input packet.
-3. Each step receives at least two independent model passes when practical, from different model families or training lineages.
-4. A third pass is used for high-risk steps, unresolved disagreements, or final reconciliation.
-5. Models produce proposals and critiques; the human operator approves state transitions.
+3. Each step is built by a cumulative amendment ladder rather than by independent voting: successive passes each take the prior artifact and alter it as they see fit, ordered from least to most capable, drawn from different training lineages so their weaknesses do not overlap.
+4. Framing is gated before filling: an opening pass produces only a skeleton, which clears a human frame-gate before any rung writes the body, so a weak early frame cannot anchor the entire step.
+5. Models build and amend; deterministic checks and the human operator approve state transitions.
 6. Deterministic tests and validators have authority over prose claims of correctness.
 7. No hidden conversational state is required to resume the project.
 8. Local inference is the target operating mode; local search, repositories, documentation mirrors, and test tools may be provided as explicit tools.
@@ -246,7 +246,7 @@ Operator note: all recorded Daemon models except Gemma 4 31B were able to load o
 
 ### Primary tier — Kratos
 
-Kratos runs the routine author, reviewer, and adjudicator sessions sequentially on its single RX 7800 XT 16 GB. A three-member quorum does not imply three models loaded concurrently. Each cold pass loads one model, writes its artifacts, unloads, and yields to the next lineage.
+Kratos runs each step's ladder rungs sequentially on its single RX 7800 XT 16 GB. A multi-rung ladder does not imply multiple models loaded concurrently. Each cold pass loads one model, writes its artifacts, unloads, and yields to the next rung.
 
 The Kratos pool therefore determines whether the local-only workflow is operational. Long-running discovery, review, decomposition, implementation, and validation jobs should default to this machine.
 
@@ -262,29 +262,38 @@ Daemon is used when:
 
 Daemon capacity should be treated as opportunistic. Two-card models should not silently become required dependencies, and Gemma 4 31B should remain a special three-card experiment.
 
-## Standard three-pass protocol for every step
+## Standard amendment-ladder protocol for every step
 
-### Pass A — Independent author
+Each step is built by a cumulative ladder of model passes. A pass does not merely critique — it takes the artifact it is handed and amends it as it sees fit. The ladder is ordered from least to most capable so cheap breadth is added first and the strongest model holds the final quality bar, and every rung is drawn from a different training lineage so overlapping blind spots do not survive. Capability ranking and lineage assignment are inputs supplied by Enki_v2 (see "Model inputs from Enki_v2"), not decided here.
 
-The author receives only the approved input packet and the step rubric. It produces a complete candidate artifact and a list of assumptions, uncertainties, and risks.
+The ordering creates one hazard — the *albatross*: because models anchor to text already on the page, a weak early frame tends to be decorated by later rungs rather than rebuilt. The protocol contains that hazard by separating **framing** from **filling** and by forcing reconsideration at every rung.
 
-### Pass B — Cross-lineage critic
+### Rung 0 — Skeleton and frame-gate
 
-The critic receives the same approved input packet, the rubric, and Pass A's output. It must identify omissions, unsupported assumptions, contradictions, scope drift, and concrete corrections. It should not silently rewrite the artifact without explaining disagreements.
+The opening pass produces only a skeleton: structure, section headers, the decomposition or interface/requirement list, an assumption register, and open questions — no prose body. Framing is the highest-leverage and least-reversible decision in the step, so it is not left to the weakest model and it is not laddered. The skeleton is set by a capable rung and then clears a **human frame-gate** — a short operator review whose only job is to accept, reject, or restructure the frame before any rung fills it. A bad frame dies here for the cost of one cheap pass instead of being carried up the whole ladder.
 
-### Pass C — Adjudicator or second independent author
+### Fill rungs — cumulative amendment, weak→strong, mixed lineage
 
-Use Pass C when the step is consequential or when A and B disagree. Depending on the experiment, the third model may:
+On the frozen skeleton the ladder runs. Each rung, in order:
 
-- Produce a second independent solution before seeing A or B
-- Adjudicate the differences after seeing both
-- Validate the reconciled artifact against the rubric
+1. Reads the rubric and the problem statement **first**, before seeing the prior artifact.
+2. Writes a three-sentence **frame-challenge**: if it were building from scratch, would it structure the artifact this way, and what would it change? A frame-challenge that calls for a *structural* change is escalated to the operator; it is not silently applied and not silently dropped.
+3. Amends the artifact as it sees fit.
+4. Emits a **KEEP / CHANGE / KILL ledger**: what it preserved and why it is defensible, what it changed and why, what it removed and why. Silent preservation is the anchoring failure mode; the KEEP column converts it into an explicit, auditable decision. A KEEP defended only by "it was already there" is a flagged smell.
 
-The chosen mode must be recorded so that independence is not overstated.
+Reading the rubric before the prior artifact, and writing the frame-challenge before editing, are what stop cumulative amendment from collapsing into sycophantic decoration of whatever the last rung produced.
+
+### Teardown rung — for framing-heavy steps (Steps 1–4)
+
+For the steps where the frame carries the most risk — discovery, vision, PRD, and decomposition — insert one pass whose job is to attack, not amend. It enumerates every structural weakness, unsupported assumption, and place the frame is wrong, and it produces findings, not an edited artifact. Red-teaming is psychologically opposite to improving, so a teardown model surfaces structural rot that a self-revising rung rationalizes past. Its findings feed the next fill rung or the operator.
+
+### Ladder length is variable, not fixed at three
+
+Stop when a rung's contribution goes cosmetic. Models carry a "must change something to justify the pass" reflex that adds verbosity and complexity rather than value, so more rungs are not monotonically better. Measure each rung by the size and substance of its diff and its CHANGE/KILL ledger; a rung that produces only cosmetic churn is the stop signal.
 
 ### Human gate
 
-The operator accepts, rejects, or edits the reconciled artifact. Only the approved version enters the next step's input packet.
+The operator accepts, rejects, or edits the final artifact. Only the approved version enters the next step's input packet, and the human edit delta is recorded (see cross-cutting controls) so correction effort remains measurable.
 
 ## Cold-session handoff packet
 
@@ -293,17 +302,30 @@ Every step directory should contain enough information to resume without chat hi
 ```text
 step-N/
 ├── INPUT.md                 # Approved facts, prior artifacts, constraints, and task prompt
-├── RUBRIC.md                # Scored requirements and completion gate
-├── pass-a-author.md         # First model output
-├── pass-b-critic.md         # Cross-lineage review
-├── pass-c-adjudicator.md    # Optional third pass
-├── DECISIONS.md             # Human decisions and rationale
+├── INPUT.sha256             # Frozen-packet checksum (committed, not just ritual)
+├── RUBRIC.md                # Scored requirements and completion gate (frame-gated before freezing)
+├── SKELETON.md              # Rung 0 frame, as accepted at the human frame-gate
+├── rung-1.md … rung-N.md    # Each fill rung's amended artifact (immutable per-rung snapshots)
+├── LEDGERS.md               # Frame-challenge + KEEP/CHANGE/KILL ledger for each rung
+├── TEARDOWN.md              # Structural attack findings (framing-heavy steps)
+├── DECISIONS.md             # Human decisions, frame-gate ruling, and rationale
 ├── ASSUMPTIONS.md           # Open and resolved assumptions
 ├── EVIDENCE.md              # Commands, tests, sources, and observed results
+├── EDIT-DELTA.md            # Diff of operator edits to the final rung (correction-effort metric)
 └── APPROVED.md              # Immutable input artifact for the next step
 ```
 
-Record the model file, quantization, context setting, KV quantization, prompt-template version, llama.cpp version, date, and role for every pass.
+Record the model file, quantization, context setting, KV quantization, prompt-template version, llama.cpp version, date, and rung role for every pass.
+
+## Cross-cutting controls
+
+These apply to every step regardless of ladder shape:
+
+- **Frozen, checksummed packet.** Each step's `INPUT.md` is frozen and its checksum recorded as a committed artifact (`INPUT.sha256`), not merely as a ritual step, because the ladder's validity depends on every rung receiving the identical packet.
+- **The rubric is itself gated.** `RUBRIC.md` encodes one lineage's notion of "good" and is the one artifact whose blind spot would bias every score consistently. It passes its own frame-gate — an independent read before it is frozen — or its human authorship is recorded as a named bias source.
+- **Honest gate taxonomy.** Steps 1–3 end at human-judgment gates; only Steps 4–6 add deterministic gates (schema validation, tests, coverage). The design does not claim machine rigor for the judgment steps. Where a "deterministic" gate depends on a validator that does not yet exist — requirement-ID→task-ID coverage for Step 4, finding-severity classification for Step 5 — that validator is named as required work, and until it exists the gate is labeled as human judgment.
+- **Backflow / amendment.** `APPROVED.md` is immutable forward, but a late step can falsify an early one (Step 5 implementation exposing a wrong Step 3 requirement). A reopen-prior-step procedure with its own human gate and evidence trail is defined so the pipeline can iterate instead of breaking at the first genuine contradiction.
+- **Immutable per-rung evidence.** Every rung's raw output is preserved before any later rung or human edit, so a regression — a later rung silently deleting a correct earlier addition — can be caught by diffing the chain.
 
 ## Final six-step process
 
@@ -326,9 +348,7 @@ Record the model file, quantization, context setting, KV quantization, prompt-te
 
 **Completion gate:** No unresolved question remains that could materially alter scope or architecture without being explicitly marked for later resolution.
 
-**Primary Kratos eyes:** Qwen 3.5 9B, Gemma 4 12B, and GPT-OSS 20B are the initial quorum candidates. Granite 3.3 8B, Falcon-H1 7B, or Kimi-VL may replace or supplement a member after context and task-quality auditions.
-
-**Daemon escalation:** Gemma 4 26B A4B, Qwen 3.6 35B-A3B, GLM 4.7 Flash, or LFM2 24B A2B when additional capacity is justified and available.
+**Ladder:** Rung 0 skeleton → fill rungs (weak→strong, mixed lineage) → teardown rung; discovery framing is high-leverage, so the teardown pass is mandatory here. Rung capability ranking and lineage assignment come from Enki_v2. Daemon rungs are optional escalation only when Kratos capacity is exceeded and ComfyUI is idle.
 
 ### Step 2 — Vision, architecture options, and roadmap
 
@@ -347,9 +367,7 @@ Record the model file, quantization, context setting, KV quantization, prompt-te
 
 **Completion gate:** The selected direction is traceable to Step 1 goals and constraints, and rejected alternatives have documented reasons.
 
-**Primary Kratos eyes:** GPT-OSS 20B and Gemma 4 12B as blind authors, with Qwen 3.5 9B, Granite 3.3 8B, or Falcon-H1 7B as adjudicator candidates after auditioning.
-
-**Daemon escalation:** Qwen 3.6 35B-A3B or Gemma 4 26B A4B. Gemma 4 31B is an optional three-card synthesis experiment only when ComfyUI is idle.
+**Ladder:** Rung 0 skeleton → fill rungs (weak→strong, mixed lineage) → teardown rung on the selected architecture. Rung ranking and lineage come from Enki_v2; Daemon rungs are optional escalation only.
 
 ### Step 3 — PRD / SRD and acceptance contract
 
@@ -370,9 +388,7 @@ Record the model file, quantization, context setting, KV quantization, prompt-te
 
 **Completion gate:** Every requirement is uniquely identified, testable or explicitly justified as qualitative, and free of unresolved interface ambiguity.
 
-**Primary Kratos eyes:** GPT-OSS 20B, Gemma 4 12B, and Qwen 3.5 9B, with Granite 3.3 8B as a promising requirements and structured-output candidate pending audition. DeepSeek Coder V2 Lite can provide a code-oriented pass within its confirmed 65K limit.
-
-**Daemon escalation:** Qwen 3.6 35B-A3B or Gemma 4 26B A4B for unusually large or difficult specifications.
+**Ladder:** Rung 0 skeleton (requirement/interface list) → fill rungs (weak→strong, mixed lineage) → teardown rung against the acceptance contract. Rung ranking and lineage come from Enki_v2; Daemon rungs are optional escalation only.
 
 ### Step 4 — Atomic implementation plan
 
@@ -394,9 +410,7 @@ Record the model file, quantization, context setting, KV quantization, prompt-te
 
 **Completion gate:** Both artifacts pass schema validation; every implementation requirement is covered; dependencies form a valid order; and every batch ends in an executable gate.
 
-**Primary Kratos eyes:** Run Qwen 3.5 9B, Granite 3.3 8B, GPT-OSS 20B, Gemma 4 12B, and DeepSeek Coder V2 Lite through the same decomposition audition. Select two different-family blind authors and a third-family adjudicator from the winners.
-
-**Daemon escalation:** Compare the approved Kratos result against Qwen 3.6 35B-A3B or Gemma 4 26B A4B when Daemon is free or the decomposition gate fails locally.
+**Ladder:** Rung 0 skeleton (task/batch structure) → fill rungs (weak→strong, mixed lineage) → teardown rung, with schema validation as the deterministic gate over all of it. Rung ranking and lineage come from Enki_v2; Daemon rungs are optional escalation only when the decomposition gate fails locally.
 
 ### Step 5 — Execute atomic batches and review evidence
 
@@ -416,9 +430,7 @@ Record the model file, quantization, context setting, KV quantization, prompt-te
 
 **Completion gate:** All task and batch checks pass, all blocking review findings are resolved, and the implementation remains traceable to the approved requirements.
 
-**Primary Kratos eyes:** Use the best auditioned Kratos coding model as implementer and a different-family Kratos model as reviewer. DeepSeek Coder V2 Lite, Qwen 3.5 9B, GPT-OSS 20B, Granite 3.3 8B, and Gemma 4 12B should compete on identical atomic tasks.
-
-**Daemon escalation:** Use Qwen3-Coder 30B A3B, Qwen 3.6 35B-A3B, or another qualified Daemon model only for failed, unusually broad, or high-risk tasks.
+**Ladder:** Rung 0 implementation plan per task → fill rungs (weak→strong, mixed lineage) amending code and notes, with the deterministic batch gate — build, tests, lint, type-check — carrying correctness over any model judgment. Rung ranking and lineage come from Enki_v2; Daemon rungs are optional escalation for failed, broad, or high-risk tasks only.
 
 ### Step 6 — Integrate, validate, and package the final deliverable
 
@@ -437,69 +449,35 @@ Record the model file, quantization, context setting, KV quantization, prompt-te
 
 **Completion gate:** A clean checkout can reproduce the build and pass the complete acceptance suite; documentation matches observed behavior; and every requirement is implemented, deferred with approval, or rejected with rationale.
 
-**Primary Kratos eyes:** Use the best Kratos synthesis model and a different-family release auditor. GPT-OSS 20B, Gemma 4 12B, Qwen 3.5 9B, and Granite 3.3 8B are the initial candidates.
+**Ladder:** Rung 0 integrated skeleton → fill rungs (weak→strong, mixed lineage) → a final release-audit rung (teardown against the acceptance suite and docs), with the clean-checkout build and full test run as the deterministic gate. Rung ranking and lineage come from Enki_v2; Daemon rungs are optional escalation only.
 
-**Daemon escalation:** Qwen 3.6 35B-A3B or Gemma 4 26B A4B may provide a higher-capacity final audit. Gemma 4 31B remains an optional three-card editorial pass, not a dependency.
+## Rung roles and lineage diversity
 
-## Model-lineage rotation strategy
+Each step's ladder fills the same roles regardless of which models occupy them:
 
-The same pair does not need to author and review every step. A useful audition matrix is:
+| Role | Capability rank | Lineage rule |
+| :--- | :--- | :--- |
+| Rung 0 — skeleton / frame | High — framing is not laddered from the weakest | Any qualified lineage |
+| Fill rungs | Ascending, least → most capable | Each rung a different training lineage from the last |
+| Teardown (Steps 1–4; Step 6 release audit) | High; attacks rather than amends | Different lineage from the final fill rung where possible |
+| Human gate | — | Operator |
 
-| Capability | Author candidate | Cross-lineage critic | Optional third eye |
-| :--- | :--- | :--- | :--- |
-| Discovery and ambiguity | GPT-OSS 20B | Gemma 4 12B | Qwen 3.5 9B, Granite 3.3 8B, Falcon-H1 7B, or Kimi-VL |
-| Vision and roadmap | GPT-OSS 20B | Gemma 4 12B | Qwen 3.5 9B, Granite 3.3 8B, or Falcon-H1 7B |
-| PRD / SRD | GPT-OSS 20B | Gemma 4 12B | Qwen 3.5 9B or Granite 3.3 8B |
-| Atomic decomposition | Winner of Kratos decomposition audition | Different-family Kratos winner | Third-family Kratos adjudicator |
-| Implementation | Winner of Kratos coding audition | Different-family Kratos code reviewer | Third-family Kratos adjudicator |
-| Integration and release | Winner of Kratos synthesis audition | Different-family Kratos release auditor | Daemon escalation only if needed |
+Which concrete models occupy each rank, per step, is supplied by Enki_v2. This project consumes that ranking; it does not produce it. Two rungs from the same lineage do not count as independent eyes, because overlapping-lineage models share the blind spots the ladder exists to cancel.
 
-This table is an audition plan, not a declaration of winners.
+## Model inputs from Enki_v2
 
-## Audition methodology
+Model capability ranking, per-step task-quality scoring, and hardware-fit qualification are **not** produced by this project. They are the output of the separate Enki_v2 evaluation and benchmarking project, which feeds this one. SBL SDLC consumes two things from Enki_v2:
 
-### Hardware qualification
+- **Hardware-runnable pool** — which models load on Kratos (single card) and Daemon (two cards), at what context and KV quantization.
+- **Per-step capability ranking** — the weak→strong ordering used to place models on each step's ladder, and the lineage of each, so rungs can be assigned and lineage diversity enforced.
 
-For each candidate, record:
+The scoring dimensions Enki uses to rank a model for a step — requirement coverage, factual grounding, explicit assumptions, internal consistency, interface precision, testability, defect discovery, scope discipline, schema validity, and human-correction effort — are also the dimensions each step's `RUBRIC.md` scores an *artifact* against; the two share a vocabulary but serve different masters (Enki ranks models, the rubric ranks artifacts).
 
-- Whether it loads
-- Effective context after model capping
-- Weight and KV quantization
-- GPU count and tensor split
-- Prompt-processing speed
-- Generation speed
-- Peak VRAM and host RAM
-- Stability across repeated starts and long prompts
+**Open interface:** the concrete handoff format between Enki_v2 and SBL SDLC — how a ranked, lineage-tagged, hardware-qualified model list per step is delivered and versioned — is not yet defined. Until it is, the placeholder is a static ranked list maintained in the vault and cited by version in each step's `INPUT.md`.
 
-### Task-quality qualification
+## Current hardware-runnable pool (snapshot)
 
-Use the same frozen input packet for every candidate. Score outputs without relying on model self-assessment.
-
-Recommended scoring categories:
-
-- Requirement coverage
-- Factual grounding
-- Explicit assumptions
-- Internal consistency
-- Interface precision
-- Testability
-- Defect discovery
-- Scope discipline
-- Artifact/schema validity
-- Human correction effort
-- Latency and throughput
-
-For Steps 4–6, deterministic artifact validation and executable tests should be reported separately from qualitative scores.
-
-### Independence controls
-
-- For a true independent third solution, do not show it previous model outputs.
-- For a critic, show the candidate but require cited findings and proposed corrections.
-- For an adjudicator, show all competing artifacts and require a decision table.
-- Preserve raw outputs before human editing.
-- Record prompt and sampling settings so results can be repeated.
-
-## Current practical lineup
+This is the hardware-fit snapshot consumed from the load tests (an Enki_v2 input, recorded here for convenience). It says only what *loads*; capability ranking among these models is Enki's, not implied by their order here.
 
 ### Two-card Daemon pool
 
@@ -526,31 +504,43 @@ For Steps 4–6, deterministic artifact validation and executable tests should b
 
 ## Immediate next actions
 
-1. Freeze one representative project concept and create the Step 1 `INPUT.md` and `RUBRIC.md`.
-2. Run controlled task-quality and speed auditions for Granite 3.3 8B and Falcon-H1 7B; their Kratos context fit is now confirmed.
-3. Run Step 1 as two blind author passes on different Kratos families.
-4. Use a third Kratos model to adjudicate after both blind outputs are frozen.
-5. Record raw outputs, settings, latency, and human edits.
-6. Approve `step-1/APPROVED.md`, then start fresh sessions for Step 2.
-7. Repeat through Step 6 without relying on prior chat memory or Daemon availability.
-8. Separately run controlled speed and prompt-length benchmarks; do not mix hardware fit scores with artifact-quality scores.
-9. Use Daemon as an explicitly recorded escalation, not as the silent default.
-10. Give this revised design to Gemini and Opus for another review, asking them specifically to challenge artifact contracts, independence controls, completion gates, and the Kratos-first topology.
+1. Define the step-directory scaffolding for the amendment ladder: `INPUT.md` + `INPUT.sha256`, `RUBRIC.md`, `SKELETON.md`, per-rung snapshots, `LEDGERS.md`, `TEARDOWN.md`, `EDIT-DELTA.md`, and `APPROVED.md`.
+2. Freeze one representative project concept and write the Step 1 `INPUT.md` and `RUBRIC.md`; give the rubric its own frame-gate before freezing.
+3. Obtain the Step 1 model ladder from Enki_v2 — a hardware-runnable, weak→strong, lineage-tagged ranking — and define the Enki_v2 → SBL SDLC handoff interface (currently undefined).
+4. Run Rung 0 to produce `SKELETON.md`; take it through the human frame-gate before any fill rung runs.
+5. Run the fill ladder weak→strong with the frame-challenge and KEEP/CHANGE/KILL ledger at each rung, then the teardown rung; record raw per-rung outputs, runtime metadata, and the operator edit delta.
+6. Approve `step-1/APPROVED.md`, then start fresh sessions for Step 2 and repeat through Step 6 without relying on prior chat memory or Daemon availability.
+7. Build the missing deterministic validators before Steps 4–6 need them: requirement→task coverage (Step 4) and finding-severity classification (Step 5).
+8. Run the ladder-vs-top-rung-solo baseline on a representative step to confirm the lower rungs earn their cost.
 
 ## Open research questions
 
-- Is critique-after-draft better than two blind independent drafts followed by adjudication?
-- At which steps does a third model materially improve quality relative to operator time?
-- How much does family diversity help after controlling for model capability?
+- Does weak→strong cumulative amendment beat the top rung running the step alone, and at which steps does the margin justify the added passes?
+- How often does the frame-gate actually catch a bad skeleton, versus adding operator overhead for frames that were fine?
+- Does the teardown rung surface structural defects the fill rungs miss, or does it mostly restate the rubric?
+- How much does lineage diversity help after controlling for capability rank?
 - What context size is actually needed at each step, rather than merely available?
-- Does Q4 KV materially degrade long-context review or requirement recall for these models?
-- Which model minimizes human correction effort for each artifact type?
+- Does Q4 KV materially degrade long-context review or requirement recall on the Kratos pool?
 - Can the full process be resumed solely from the step directory after every session is discarded?
+
+---
+
+# Part IV — Opus 4.8 Review (2026-07-13, merged)
+
+An Opus 4.8 review challenged the four areas Part III's predecessor asked an external model to stress — artifact contracts, independence controls, completion gates, and the Kratos-first topology — under the project's local-only, weakness-cancellation premise. Its corrections have been **merged into Part III**; this section records what changed and why, in the doc's layered-history style.
+
+The largest finding retired the design's central assumption. The blind-independence quorum (two independent drafts plus adjudication) was an artifact of an earlier mistaken goal; the operator's actual intent is a **cumulative amendment ladder**, where each rung alters the artifact as it sees fit. Part III's protocol was rewritten to that model. The review's job then became protecting the ladder from its one hazard — the *albatross*, where a weak early frame anchors every later rung — which Part III now handles by gating the frame before filling, forcing a frame-challenge and KEEP/CHANGE/KILL ledger at each rung, adding a non-editing teardown pass for framing-heavy steps, and letting ladder length vary.
+
+The protocol-agnostic corrections became Part III's **cross-cutting controls**: a checksummed frozen packet as a real artifact, an independence gate on the rubric itself, an honest gate taxonomy (Steps 1–3 are human-judgment; only 4–6 add deterministic gates) with the missing validators named, a backflow procedure for when a late step falsifies an approved early one, and immutable per-rung evidence. The control-arm idea was reframed to the local-only premise: not a cloud upper bound but the **top rung running the step solo**, diffed against the full ladder to prove the lower rungs earn their cost.
+
+Two of the original review's points were withdrawn as incompatible with the chosen ladder: the recommendation for blind-parallel authorship on Steps 1–3, and the defect-disjointness metric across parallel passes — replaced, respectively, by the frame-gate and by per-rung marginal-value measurement (did this rung repair the prior rung's defects and add value).
 
 ---
 
 ## Changelog
 
+- 2026-07-13 (Opus 4.8 merge) — Merged the Opus 4.8 review into Part III and rewrote the protocol from the blind-independence quorum to the operator's cumulative amendment ladder: skeleton + human frame-gate before filling, weak→strong cross-lineage fill rungs each with a frame-challenge and KEEP/CHANGE/KILL ledger, a non-editing teardown rung for Steps 1–4 (and a Step 6 release audit), and variable ladder length. Added cross-cutting controls (checksummed packet, rubric independence gate, honest gate taxonomy + named validators, backflow, immutable per-rung evidence). Scoped model auditions and capability ranking out to Enki_v2, which feeds this project; reframed the step ladder lines, the rung-role table, the model-inputs section, the hardware-pool snapshot, next actions, and open questions accordingly. Collapsed Part IV to a merged-review record.
+- 2026-07-13 (Opus 4.8 review) — Initial Part IV review challenging artifact contracts, independence controls, completion gates, and the Kratos-first topology (now merged into Part III).
 - 2026-07-13 (Codex) — Adopted into the `sbl-sdlc` repository as the project's deep-context research handoff.
 - 2026-07-13 (Gemini 3.1 Pro / Opus review context) — Original local-model SDLC proposal and candidate mapping.
 - 2026-07-13 (GPT 5.6 review) — Clarified the cold-session multi-lineage goal; corrected the missing implementation phase, artifact contracts, deterministic gates, context assumptions, and empirical hardware classifications.
