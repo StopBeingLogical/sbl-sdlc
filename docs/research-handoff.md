@@ -19,6 +19,13 @@ tags:
 
 > **Project canon:** This copy now lives with the implementation project at `~/code/sbl-sdlc`. The vault copy preserves the research-session provenance; future project-specific evolution should land here and be summarized back to the vault/Seshat indexes.
 
+> **Hardware amendment — 2026-09-15.** Daemon no longer has three cards: a PCIe slot failed on 2026-09-11 and the third 5060 Ti was removed, and on 2026-09-15 every three-card configuration was retired from the host. The Parts below are preserved **as written** — they are dated working records, not current state — so the consequences are recorded here instead:
+>
+> - **Daemon is a 2× RTX 5060 Ti node** (`CUDA0` + `CUDA1`). There is no third island to reserve for ComfyUI: ComfyUI and llama-swap now contend for the same two cards and are handed off by drain/release rather than held by different islands. Every mention below of "preserving a Daemon card for ComfyUI" is void.
+> - **Gemma 4 31B is no longer servable on Daemon.** It was the single model in this document that needed three cards (Part II §8; Part III "Conditional three-card pool"). That pool is now empty on this fleet. Gemma 4 31B still exists on **Logos**.
+> - **The two-card findings still hold, but their headroom does not.** Qwen 3.6 35B-A3B and Gemma 4 26B A4B both serve 262,144 at Q8 KV on two cards — which is now the entire machine rather than half of it.
+> - The single-card Kratos fallback recommendation is unaffected and gains weight: it is now the only configuration that leaves Daemon's cards entirely free.
+
 ## Purpose and reading order
 
 This document records three distinct layers of the project:

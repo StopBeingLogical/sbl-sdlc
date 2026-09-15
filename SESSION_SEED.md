@@ -87,7 +87,7 @@ rg --files
 ## Technical stack & constraints
 
 - Primary inference host: Kratos, RX 7800 XT 16 GB, llama.cpp/ROCm.
-- Secondary inference host: Daemon, 3× RTX 5060 Ti 16 GB, shared with ComfyUI.
+- Secondary inference host: Daemon, 2× RTX 5060 Ti 16 GB, shared with ComfyUI. (Was 3× until 2026-09-11, when a PCIe slot failed and the third card was removed; every three-card setup was retired from the host 2026-09-15.)
 - Normal ladder rungs run sequentially, not concurrently.
 - Artifact formats should remain inspectable and local-first: Markdown, JSON, YAML, source files, and command logs.
 
