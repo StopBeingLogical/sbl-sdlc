@@ -1,3 +1,5 @@
+> **Consolidated 2026-09 into mushdamma (http://192.168.3.174:3000/bobby/mushdamma) at `sdlc/` under DEC-0028.** This repository is frozen; do not develop here.
+
 # SBL SDLC
 
 SBL SDLC is the Stop Being Logical demonstration and research project for running a complete software-development deliberation pipeline on local hardware and open-weight models.

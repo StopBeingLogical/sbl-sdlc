@@ -10,6 +10,8 @@ tags:
 timestamp: 2026-07-13T00:00:00Z
 ---
 
+> **Consolidated 2026-09 into mushdamma (http://192.168.3.174:3000/bobby/mushdamma) at `sdlc/` under DEC-0028.** This repository is frozen; do not develop here.
+
 # SBL SDLC — Session Seed
 
 ## What it is
